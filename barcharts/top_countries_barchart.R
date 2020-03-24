@@ -82,9 +82,60 @@ print(gg)
 
 # ----- Plotly version ---------------------------------------------------------
 
-# TODO:  Improve labeling
-# TODO:  Move legend back to top
+# Use data.table (very easy to order)
+dt <- data.table(covid)
+setorder(dt, `current confirmed cases`)
+# Create y labels
+ylabs <- as.character(dt$region)
+# title
+title <- "Countries with more than 1000 currently confirmed COVID–19 cases"
+# Make color theme
+cols <- list(
+  "current confirmed cases" = "#166071",
+  "deaths" = "#17181C",
+  "recovered" = "#93BF46"
+)
+# function to determine whether to display bar text
+show_nums <- function(x) ifelse(x >= 5000, 'inside', 'none')
 
-# plotly::ggplotly(gg)
+# plot
+pp <- plot_ly(
+  data = dt,
+  type = 'bar'
+) %>%
+  add_trace( x = ~`current confirmed cases`,
+             y = ~region,
+             marker = list(color = cols$`current confirmed cases`),
+             name = 'current confirmed cases',
+             text = ~`current confirmed cases`,
+             textposition = ~show_nums(`current confirmed cases`) ) %>%
+  add_trace( x = ~deaths,
+             y = ~region,
+             marker = list(color = cols$deaths),
+             name = 'deaths',
+             text = ~deaths,
+             textposition = ~show_nums(deaths) ) %>%
+  add_trace( x = ~recovered,
+             y = ~region,
+             marker = list(color = cols$recovered),
+             name = 'recovered',
+             text = ~recovered,
+             textposition = ~show_nums(recovered) ) %>%
+  layout( title = list(text = title, font = list(size = 18, color = 'black')),
+          legend = list(orientation = 'h', y = 1.05),
+          barmode = 'stack',
+          xaxis = list(  title = '',
+                         zeroline = FALSE,
+                         showline = FALSE,
+                         showticklabels = FALSE,
+                         showgrid = FALSE),
+          yaxis = list(  title = '',
+                         zeroline = FALSE,
+                         showline = FALSE,
+                         showticklabels = TRUE,
+                         showgrid = TRUE) ,
+          margin = list(l = 0, r = 0, b = 0, t = 100) ) %>%
+  config(displayModeBar = FALSE)
 
+print(pp)
 
