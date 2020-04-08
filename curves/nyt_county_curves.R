@@ -30,3 +30,36 @@ ggplot(King_County) +
   geom_point() +
   geom_smooth()
 
+# ----- Daily by state ---------------------------------------------------------
+
+firstDate <-
+  tidyCovid %>%
+  slice(1) %>%
+  pull(date)
+
+myState <- "New York"
+dailyNew <- 
+  tidyCovid %>%
+  filter(state == myState) %>%
+  group_by(date) %>%
+  summarize(allDeaths = sum(deaths)) %>%
+  mutate(newDeaths = c(NA, diff(allDeaths))) %>%
+  mutate(day = as.numeric(difftime(date, firstDate, unit = "day")))
+
+tail(dailyNew)
+  
+
+ggplot(dailyNew) +
+  aes(x = date, y = newDeaths) +
+  geom_point() +
+  geom_smooth() +
+  ggtitle(sprintf("Daily New Deaths in %s", myState))
+
+# # Exponential fit
+# b <- 0.5
+# ggplot(dailyNew) +
+#   aes(x = day, y = newDeaths) +
+#   geom_point() +
+#   geom_smooth(method = "lm", formula = y ~ exp(b * x)) +
+#   ggtitle(sprintf("Daily New Deaths in %s", myState))
+# 
