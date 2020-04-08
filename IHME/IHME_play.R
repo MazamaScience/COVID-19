@@ -23,7 +23,7 @@ ihme <- readr::read_csv("2020_04_05.08.all/Hospitalization_all_locs.csv")
 
 # ----- Daily by state ---------------------------------------------------------
 
-myState <- "Louisiana"
+myState <- "Washington"
 predictionDate <- MazamaCoreUtils::parseDatetime("2020-04-05", timezone = "UTC")
 
 firstDate <-
@@ -35,17 +35,19 @@ daily <-
   ihme %>%
   filter(location_name == myState) %>%
   mutate(isProjection = date > predictionDate) %>%
-  mutate(day = as.numeric(difftime(date, firstDate, unit = "day")))
+  mutate(deaths_7day = zoo::rollmean(deaths_mean, 7, align = "right", fill = NA)) %>%
+  mutate(day = as.numeric(difftime(date, firstDate, unit = "day"))) %>%
+  select(date, day, deaths_mean, deaths_7day, isProjection)
 
 tail(daily)
   
 ggplot(daily) +
-  aes(x = date, y = deaths_mean, col = isProjection) +
-  geom_point() +
-  geom_smooth(
+  geom_area(
     data = subset(daily, isProjection == FALSE),
-    method = "loess",
-    formula = y ~ x
+    mapping = aes(x = date, y = deaths_7day),
+    colour = 'black',
+    alpha = 0.2
   ) +
+  geom_point(aes(x = date, y = deaths_mean, col = isProjection)) +
   ggtitle(sprintf("Daily New Deaths in %s", myState))
 
