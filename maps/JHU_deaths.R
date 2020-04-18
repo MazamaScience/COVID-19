@@ -1,4 +1,12 @@
 # Quick access to JHU data
+#
+
+# ----- Configurables ----------------------------------------------------------
+
+DATESTRING = "4/17/2020"
+DATESTAMP <- "UTC_20200417"
+
+# ----- Setup ------------------------------------------------------------------
 
 library(dplyr)
 
@@ -7,8 +15,16 @@ setSpatialDataDir("~/Data/Spatial")
 loadSpatialData("USCensusStates")
 loadSpatialData("USCensusCounties")
 
-library(tidycensus)
+###library(tidycensus)
 library(tmap)
+
+# ----- Download, parse data ---------------------------------------------------
+
+# Data description:
+#
+# https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data#time-series-summary-csse_covid_19_time_series
+#
+# Dates are UTC
 
 # Load data
 df <- readr::read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_US.csv")
@@ -35,23 +51,42 @@ df <- readr::read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19
 # [91] "4/9/20"         "4/10/20"        "4/11/20"        "4/12/20"        "4/13/20"       
 # [96] "4/14/20"        "4/15/20"        "4/16/20"       
 
-# Select latest and clean up
-deathsByCounty_DF <-
+# Data frame with deaths by county
+#  * start with df
+#  * remove unneeded columns
+#  * use/create Mazama Science standard names
+#  * remove old names
+#  * filter out records with missing countyNames
+byCounty_DF <-
   df %>%
-  select(iso2, Admin2, FIPS, Province_State, Population, "4/15/20", "4/16/20") %>%
+  select(-UID, -iso3, -code3, -Country_Region, -Lat, -Long_, -Combined_Key) %>%
   mutate(
     countryCode = iso2,
-    stateCode = stateToCode(df$Province_State, countryCodes = "US", dataset = "USCensusStates"),
+    stateCode = stateToCode(Province_State, countryCodes = "US", dataset = "USCensusStates"),
     countyName = Admin2,
-    population = Population,
-    deaths = `4/16/20` - `4/15/20`
+    FIPS = sprintf("%05d", FIPS), # Codes are names, not numbers (e.g. '007').
+    population = Population
   ) %>%
-  select(countryCode, stateCode, countyName, population, deaths) %>%
+  select(-iso2, -Province_State, -Admin2, -Population) %>%
   filter(!is.na(countyName)) %>%
   filter(countyName != "Unassigned") %>%
   filter(!stringr::str_detect(countyName, "Out of"))
-  
-# Bind to USCensusCounties dataframe
+
+# ----- Rename and reorder columns ---------------------------------------------
+
+spatialNames <- c("countryCode", "stateCode", "countyName", "FIPS", "population")
+dateStamps <- 
+  setdiff(names(byCounty_DF), spatialNames) %>%
+  lubridate::parse_date_time("mdy", tz = "UTC") %>%
+  strftime(format = "UTC_%Y%m%d", tz = "UTC")
+
+spatial_byCounty_DF <- select(byCounty_DF, !!spatialNames)
+numeric_byCounty_DF <- select(byCounty_DF, contains("/"))
+names(numeric_byCounty_DF) <- dateStamps
+
+deathsByCounty_DF <- bind_cols(spatial_byCounty_DF, numeric_byCounty_DF)
+
+# ----- Create county spatial dataset ------------------------------------------
 
 county_DF <- left_join(
   USCensusCounties@data,
@@ -61,49 +96,34 @@ county_DF <- left_join(
 
 USCensusCounties@data <- county_DF
 
-# Get census map (NEEDS AN API KEY)
-
-# dat16 <- 
-#   get_acs(
-#     "county", 
-#     table = "B27001", 
-#     year = 2016, 
-#     output = "tidy", 
-#     state = NULL, 
-#     geometry = TRUE, 
-#     shift_geo = TRUE
-#   ) %>%
-#   rename(`2016` = estimate) %>%
-#   select(-moe)
-
-# Create a map 
+# ----- Create a map -----------------------------------------------------------
 
 conus_SPDF <- subset(USCensusCounties, stateCode %in% CONUS)
 conus_proj <- sp::CRS("+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs")
 
-# Population
-breaks <- c(0,10000,20000,50000,100000,200000,500000,Inf)
-
-tm_shape(conus_SPDF, projection = conus_proj) +
-  tm_polygons(
-    "population",
-    breaks = breaks,
-    #style = "log10_pretty",
-    palette = "YlOrBr",
-    border.col = "white"
-  ) +
-  tm_shape(USCensusStates, projection = conus_proj) +
-  tm_polygons(
-    alpha = 0,
-    border.col = "gray50"
-  )
+# # Population
+# breaks <- c(0,10000,20000,50000,100000,200000,500000,Inf)
+# 
+# tm_shape(conus_SPDF, projection = conus_proj) +
+#   tm_polygons(
+#     "population",
+#     breaks = breaks,
+#     #style = "log10_pretty",
+#     palette = "YlOrBr",
+#     border.col = "white"
+#   ) +
+#   tm_shape(USCensusStates, projection = conus_proj) +
+#   tm_polygons(
+#     alpha = 0,
+#     border.col = "gray50"
+#   )
 
 # Deaths
-breaks <- c(-Inf,0,1,2,5,10,20,50,100,Inf)
+breaks <- c(0,1,2,5,10,20,50,100,Inf)
 
 tm_shape(conus_SPDF, projection = conus_proj) +
   tm_polygons(
-    "deaths",
+    DATESTAMP,
     breaks = breaks,
     #style = "jenks",
     palette = "YlOrBr",
@@ -113,8 +133,36 @@ tm_shape(conus_SPDF, projection = conus_proj) +
   tm_polygons(
     alpha = 0,
     border.col = "gray50"
+  ) +
+  tm_layout(
+    title = paste0("Cumulative COVID-19 Deaths per County on ", DATESTRING),
+    title.size = 1.1,
+    title.position = c("center", "top"),
+    frame = FALSE
   )
 
+# ==============================================================================
 
+if ( FALSE ) {
+  
+  # Mapping idea from
+  # https://www.zevross.com/blog/2018/10/02/creating-beautiful-demographic-maps-in-r-with-the-tidycensus-and-tmap-packages/
+  
+  # Get census map (NEEDS AN API KEY)
+  
+  # dat16 <- 
+  #   get_acs(
+  #     "county", 
+  #     table = "B27001", 
+  #     year = 2016, 
+  #     output = "tidy", 
+  #     state = NULL, 
+  #     geometry = TRUE, 
+  #     shift_geo = TRUE
+  #   ) %>%
+  #   rename(`2016` = estimate) %>%
+  #   select(-moe)
+  
+}
 
 
