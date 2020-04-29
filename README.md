@@ -15,7 +15,13 @@ projections.
 
 * https://github.com/reichlab/covid19-forecast-hub
 
-## Mapping
+### Mapping
 
 * http://zevross.com/blog/2018/10/02/creating-beautiful-demographic-maps-in-r-with-the-tidycensus-and-tmap-packages/
+
+### Harvard COVID/smoke
+
+https://github.com/wxwx1993/PM_COVID
+
+Lots of R code for data processing, visualization, etc.
 
