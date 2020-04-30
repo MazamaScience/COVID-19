@@ -25,3 +25,9 @@ https://github.com/wxwx1993/PM_COVID
 
 Lots of R code for data processing, visualization, etc.
 
+## R packages
+
+Check r-bloggers.com and CRAN regularly for any new packages.
+
+* https://cran.r-project.org/web/packages/COVID19
+
