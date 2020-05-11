@@ -4,7 +4,9 @@
 
 WORKING_DIR <- path.expand("~/Projects/MazamaScience/COVID-19")
 
+library(data.table)
 library(ggplot2)
+library(plotly)
 library(hrbrthemes)
 
 # ----- Prepare COVID data -------------------------------------------------------
@@ -99,7 +101,7 @@ cols <- list(
 show_nums <- function(x) ifelse(x >= 5000, 'inside', 'none')
 
 # plot
-pp <- plot_ly(
+pp <- plotly::plot_ly(
   data = dt,
   type = 'bar'
 ) %>%
