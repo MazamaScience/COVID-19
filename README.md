@@ -32,4 +32,7 @@ Check r-bloggers.com and CRAN regularly for any new packages.
 * https://cran.r-project.org/web/packages/COVID19
 * https://covid19r.github.io/covid19nytimes
 
+## COVID19R Github site
+
+* https://github.com/Covid19R
 
