@@ -30,4 +30,6 @@ Lots of R code for data processing, visualization, etc.
 Check r-bloggers.com and CRAN regularly for any new packages.
 
 * https://cran.r-project.org/web/packages/COVID19
+* https://covid19r.github.io/covid19nytimes
+
 
