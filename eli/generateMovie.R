@@ -1,4 +1,45 @@
-
+# Example:
+# stateCovid <- 
+#  COVID19::covid19("US", level = 2) %>%
+#    rename(
+#      countryCode = iso_alpha_2,
+#      stateCode = key_alpha_2
+#    ) %>%
+#    # add derived values
+#    mutate(
+#      test_per_100 = 100 * tests/population,
+#      confirmed_per_100 = 100 * confirmed/population,
+#      recovered_per_100K = 100000 * recovered/population,
+#      deaths_per_100K = 100000 * deaths/population,
+#      hosp_per_100K = 100000 * hosp/population,
+#      vent_per_100K = 100000 * vent/population,
+#      icu_per_100K = 100000 * icu/population
+#    )
+#
+# ----- TWO STATES 1 MONTH -----
+# generateMovie(data = stateCovid, 
+#               parameter = "confirmed_per_100", 
+#               stateCodes = c("WA", "OR"),
+#               startDate = 20200601,
+#               endDate = 20200701,
+#               breaks = seq(0, max(stateCovid$confirmed_per_100, na.rm = TRUE), .1),
+#               saveDir = "/home/eli/,
+#               movieFileName = "covid_confirmed",
+#               mapTitle = "Confirmed COVID Cases (Per 100 Citizens)",
+#               frame = TRUE,
+#               inner.margins = .1)
+# 
+# ----- ALL STATES WHOLE YEAR -----
+# generateMovie(data = stateCovid, 
+#               parameter = "confirmed_per_100", 
+#               startDate = 20200101, 
+#               endDate = lubridate::today(tzone = "America/Los_Angeles"), 
+#               saveDir = "/home/eli/", 
+#               breaks = seq(0, max(stateCovid$confirmed_per_100, na.rm = T), 0.1), 
+#               movieFileName = "covid_confirmed",
+#               mapTitle = "Confirmed COVID Cases (Per 100 Citizens)",
+#               frame = TRUE,
+#               inner.margins = .1)
 
 generateMovie <- function(
   data = NULL,
@@ -7,20 +48,22 @@ generateMovie <- function(
   startDate = NULL,
   endDate = NULL,
   breaks = c(0, 0.005, 0.01, 0.03, 0.05, 0.16),
+  mapTitle = NULL,
+  frame = FALSE,
   imageWidth = 10,
   imageHeight = 8,
   imageDpi = 75,
   frameRate = 6,
   saveDir = NULL,
   movieFileName = NULL,
-  verbose = FALSE
+  verbose = FALSE,
+  ...
 ) {
   
   # ----- Validate Parameters --------------------------------------------------
   
   MazamaCoreUtils::stopIfNull(data)
   MazamaCoreUtils::stopIfNull(parameter)
-  MazamaCoreUtils::stopIfNull(stateCodes)
   MazamaCoreUtils::stopIfNull(startDate)
   MazamaCoreUtils::stopIfNull(endDate)
   MazamaCoreUtils::stopIfNull(saveDir)
@@ -54,6 +97,9 @@ generateMovie <- function(
   imageWidthPx <- imageDpi * imageWidth
   imageHeightPx <- imageDpi * imageHeight
   
+  if ( is.null(mapTitle) )
+    mapTitle <- sprintf("%s in The United States", parameter)
+  
   tmap::tmap_options(show.messages = verbose, show.warnings = verbose)
   
   timestep <- 0
@@ -63,12 +109,29 @@ generateMovie <- function(
     fileName <- sprintf("%s%03d.png", imageNameBase, timestep)
     filePath <- file.path(saveDir, fileName)
     
-    tm <- MazamaSpatialPlots::stateMap(
-      data = dplyr::filter(data, date == datestamp),
-      parameter = parameter,
-      breaks = breaks,
-      stateCode = stateCodes,
-      title = datestamp
+    if( is.null(stateCodes) ) {
+      tm <- MazamaSpatialPlots::stateMap(
+        data = dplyr::filter(data, date == datestamp),
+        parameter = parameter,
+        breaks = breaks
+      )    
+    } else {
+      tm <- MazamaSpatialPlots::stateMap(
+        data = dplyr::filter(data, date == datestamp),
+        parameter = parameter,
+        breaks = breaks,
+        stateCode = stateCodes
+      )
+    }
+
+    tm <- tm + tmap::tm_layout(
+      frame = frame,
+      main.title = paste0(mapTitle, sprintf("\n %s", datestamp)),
+      main.title.position = c("center", "top"),
+      title.fontface = 2,
+      fontfamily = "serif",
+      legend.position = c('left', 'top'),
+      ...
     )
     
     # Save plot
@@ -91,10 +154,15 @@ generateMovie <- function(
   
   outputDir <- path.expand(".")
   
+  if ( verbose )
+    loglevel <- "verbose"
+  else
+    loglevel <- "info"
+  
   # Define system calls to ffmpeg to create video from frames
   cmd_cd <- paste0("cd ", saveDir)
   cmd_ffmpeg <- paste0(
-    "ffmpeg -y -loglevel quiet -r ", 
+    "ffmpeg -y -loglevel ", loglevel, " -r ", 
     frameRate, " -f image2 -s ", imageWidthPx, "x", imageHeightPx, " -i ", 
     imageNameBase, "%03d.png -vcodec libx264 -crf 25 ", 
     # https://bugzilla.mozilla.org/show_bug.cgi?id=1368063#c7
@@ -105,11 +173,11 @@ generateMovie <- function(
   cmd <- paste0(cmd_cd, " && ", cmd_ffmpeg, " && ", cmd_rm)
   
   #### Make system calls
-  ###logger.info("Calling ffmpeg to make video from frames")
+  ###warning("Calling ffmpeg to make video from frames")
   ###logger.trace(cmd)
   
   ffmpegString <- paste(capture.output(system(cmd)), collapse = "\n")
   
-  ###logger.trace("ffmpeg output:\n\n%s\n", ffmpegString)
+  ###warning("ffmpeg output:\n\n%s\n", ffmpegString)
   
 }
