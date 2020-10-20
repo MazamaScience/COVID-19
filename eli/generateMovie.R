@@ -1,5 +1,5 @@
 # Example:
- stateCovid <- 
+stateCovid <- 
   COVID19::covid19("US", level = 2) %>%
     rename(
       countryCode = iso_alpha_2,
@@ -17,17 +17,17 @@
     )
 
 # ----- TWO STATES 1 MONTH -----
- generateMovie(data = stateCovid, 
-               parameter = "confirmed_per_100", 
-               stateCodes = c("WA", "OR"),
-               startDate = 20200601,
-               endDate = 20200701,
-               breaks = seq(0, max(stateCovid$confirmed_per_100, na.rm = TRUE), .1),
-               saveDir = "/home/eli/",
-               movieFileName = "covid_confirmed",
-               main.title = "Confirmed COVID Cases (Per 100 Citizens)",
-               frame = TRUE,
-               inner.margins = .1)
+generateMovie(data = stateCovid, 
+              parameter = "confirmed_per_100", 
+              stateCodes = c("WA", "OR"),
+              startDate = 20200601,
+              endDate = 20200701,
+              breaks = seq(0, 1, .2),
+              saveDir = "/home/eli/",
+              movieFileName = "covid_confirmed",
+              main.title = "Confirmed COVID Cases (Per 100 Citizens)",
+              frame = TRUE,
+              inner.margins = .1)
  
  # ----- TWO STATES 1 MONTH TWO PARAMS-----
  generateMovie(data = stateCovid, 
@@ -44,16 +44,16 @@
                inner.margins = .1)
  
 # ----- ALL STATES WHOLE YEAR -----
- generateMovie(data = stateCovid, 
-               parameter = "confirmed_per_100", 
-               startDate = 20200101, 
-               endDate = lubridate::today(tzone = "America/Los_Angeles"), 
-               saveDir = "/home/eli/", 
-               breaks = seq(0, max(stateCovid$confirmed_per_100, na.rm = T), 0.1), 
-               movieFileName = "covid_confirmed_2020",
-               main.title = "Confirmed COVID Cases (Per 100 Citizens)",
-               frame = TRUE,
-               inner.margins = .1)
+generateMovie(data = stateCovid, 
+              parameter = "confirmed_per_100", 
+              startDate = 20200101, 
+              endDate = lubridate::today(tzone = "America/Los_Angeles"), 
+              saveDir = "/home/eli/", 
+              breaks = seq(0, max(stateCovid$confirmed_per_100, na.rm = T), 0.1), 
+              movieFileName = "covid_confirmed_2020",
+              main.title = "Confirmed COVID Cases (Per 100 Citizens)",
+              frame = TRUE,
+              inner.margins = .1)
 
 generateMovie <- function(
   data = NULL,
