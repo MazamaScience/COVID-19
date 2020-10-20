@@ -1,45 +1,59 @@
 # Example:
-# stateCovid <- 
-#  COVID19::covid19("US", level = 2) %>%
-#    rename(
-#      countryCode = iso_alpha_2,
-#      stateCode = key_alpha_2
-#    ) %>%
-#    # add derived values
-#    mutate(
-#      test_per_100 = 100 * tests/population,
-#      confirmed_per_100 = 100 * confirmed/population,
-#      recovered_per_100K = 100000 * recovered/population,
-#      deaths_per_100K = 100000 * deaths/population,
-#      hosp_per_100K = 100000 * hosp/population,
-#      vent_per_100K = 100000 * vent/population,
-#      icu_per_100K = 100000 * icu/population
-#    )
-#
+ stateCovid <- 
+  COVID19::covid19("US", level = 2) %>%
+    rename(
+      countryCode = iso_alpha_2,
+      stateCode = key_alpha_2
+    ) %>%
+    # add derived values
+    mutate(
+      test_per_100 = 100 * tests/population,
+      confirmed_per_100 = 100 * confirmed/population,
+      recovered_per_100K = 100000 * recovered/population,
+      deaths_per_100K = 100000 * deaths/population,
+      hosp_per_100K = 100000 * hosp/population,
+      vent_per_100K = 100000 * vent/population,
+      icu_per_100K = 100000 * icu/population
+    )
+
 # ----- TWO STATES 1 MONTH -----
-# generateMovie(data = stateCovid, 
-#               parameter = "confirmed_per_100", 
-#               stateCodes = c("WA", "OR"),
-#               startDate = 20200601,
-#               endDate = 20200701,
-#               breaks = seq(0, max(stateCovid$confirmed_per_100, na.rm = TRUE), .1),
-#               saveDir = "/home/eli/,
-#               movieFileName = "covid_confirmed",
-#               mapTitle = "Confirmed COVID Cases (Per 100 Citizens)",
-#               frame = TRUE,
-#               inner.margins = .1)
-# 
+ generateMovie(data = stateCovid, 
+               parameter = "confirmed_per_100", 
+               stateCodes = c("WA", "OR"),
+               startDate = 20200601,
+               endDate = 20200701,
+               breaks = seq(0, max(stateCovid$confirmed_per_100, na.rm = TRUE), .1),
+               saveDir = "/home/eli/",
+               movieFileName = "covid_confirmed",
+               main.title = "Confirmed COVID Cases (Per 100 Citizens)",
+               frame = TRUE,
+               inner.margins = .1)
+ 
+ # ----- TWO STATES 1 MONTH TWO PARAMS-----
+ generateMovie(data = stateCovid, 
+               parameter = c("confirmed_per_100", "test_per_100"), 
+               stateCodes = c("WA", "OR"),
+               startDate = 20200601,
+               endDate = 20200701,
+               breaks = c(0, .1, .2, .3, .4, .5, 1, 3, 5, 7, 9),
+               saveDir = "/home/eli/",
+               movieFileName = "covid_confirmed_tests",
+               main.title = "Confirmed COVID Cases and COVID Tests (Per 100)",
+               title = c("Confirmed per 100", "Tests per 100"),
+               frame = TRUE,
+               inner.margins = .1)
+ 
 # ----- ALL STATES WHOLE YEAR -----
-# generateMovie(data = stateCovid, 
-#               parameter = "confirmed_per_100", 
-#               startDate = 20200101, 
-#               endDate = lubridate::today(tzone = "America/Los_Angeles"), 
-#               saveDir = "/home/eli/", 
-#               breaks = seq(0, max(stateCovid$confirmed_per_100, na.rm = T), 0.1), 
-#               movieFileName = "covid_confirmed",
-#               mapTitle = "Confirmed COVID Cases (Per 100 Citizens)",
-#               frame = TRUE,
-#               inner.margins = .1)
+ generateMovie(data = stateCovid, 
+               parameter = "confirmed_per_100", 
+               startDate = 20200101, 
+               endDate = lubridate::today(tzone = "America/Los_Angeles"), 
+               saveDir = "/home/eli/", 
+               breaks = seq(0, max(stateCovid$confirmed_per_100, na.rm = T), 0.1), 
+               movieFileName = "covid_confirmed_2020",
+               main.title = "Confirmed COVID Cases (Per 100 Citizens)",
+               frame = TRUE,
+               inner.margins = .1)
 
 generateMovie <- function(
   data = NULL,
@@ -48,7 +62,8 @@ generateMovie <- function(
   startDate = NULL,
   endDate = NULL,
   breaks = c(0, 0.005, 0.01, 0.03, 0.05, 0.16),
-  mapTitle = NULL,
+  title = NULL,
+  main.title = NULL,
   frame = FALSE,
   imageWidth = 10,
   imageHeight = 8,
@@ -72,7 +87,7 @@ generateMovie <- function(
   if ( !("date" %in% names(data)) )
     stop("Parameter 'data' must have a column called 'date' containing the dates and times of observations.")
   
-  if ( !(parameter %in% names(data)) )
+  if ( !all(parameter %in% names(data)) )
     stop(sprintf("Parameter 'data' does not contain a column called %s", parameter))
   
   parseDates <- try({
@@ -84,6 +99,9 @@ generateMovie <- function(
 
   if ( tolower(stringr::str_sub(movieFileName, -4)) == ".mp4")
     fileName <- stringr::str_sub(movieFileName, 0, -5)
+  
+  if ( !is.null(title) && length(parameter) != length(title) )
+    stop("The lengths of 'parameter' and 'title' must be equal.")
   
   # ----- Generate animation ---------------------------------------------------
   
@@ -97,8 +115,8 @@ generateMovie <- function(
   imageWidthPx <- imageDpi * imageWidth
   imageHeightPx <- imageDpi * imageHeight
   
-  if ( is.null(mapTitle) )
-    mapTitle <- sprintf("%s in The United States", parameter)
+  if ( is.null(main.title) )
+    main.title <- sprintf("%s in The United States", paste0(parameter, collapse = ", "))
   
   tmap::tmap_options(show.messages = verbose, show.warnings = verbose)
   
@@ -126,8 +144,10 @@ generateMovie <- function(
 
     tm <- tm + tmap::tm_layout(
       frame = frame,
-      main.title = paste0(mapTitle, sprintf("\n %s", datestamp)),
+      main.title = paste0(main.title, sprintf("\n %s", datestamp)),
       main.title.position = c("center", "top"),
+      title = title,
+      title.position = c("center", "top"),
       title.fontface = 2,
       fontfamily = "serif",
       legend.position = c('left', 'top'),
