@@ -48,7 +48,7 @@ stateCovid <-
 # Try out a single date
 covidDF <- 
   stateCovid %>%
-  dplyr::filter(date == "2020-03-26")
+  dplyr::filter(date == "2020-10-10")
 
 # ----- Create multi-parameter map ---------------------------------------------
 
