@@ -2,18 +2,23 @@
 if ( FALSE ) {
   
   library(dplyr)
+  library(ggplot2)
   
-  library(MazamaPlotUtils)
+  library(MazamaSpatialPlots)
   mazama_initialize()
   
   # Example:
   stateCovid <- 
+    
     COVID19::covid19("US", level = 2) %>%
+    
     dplyr::rename(
       countryCode = iso_alpha_2,
       stateCode = key_alpha_2
     ) %>%
+    
     dplyr::group_by(stateCode) %>%
+    
     # NOTE:  tests, confirmed, recoverd and deaths are cumulative
     # NOTE:  https://covid19datahub.io/articles/doc/data.html
     dplyr::mutate(
@@ -22,17 +27,45 @@ if ( FALSE ) {
       r_diff = c(NA, diff(recovered)),
       d_diff = c(NA, diff(deaths))
     ) %>%
+    
+    # Add rolling means
+    dplyr::mutate(
+      t_diff_15 = zoo::rollmean(t_diff, k = 15, align = "right", fill = NA),
+      c_diff_15 = zoo::rollmean(c_diff, k = 15, align = "right", fill = NA),
+      r_diff_15 = zoo::rollmean(r_diff, k = 15, align = "right", fill = NA),
+      d_diff_15 = zoo::rollmean(d_diff, k = 15, align = "right", fill = NA)
+    ) %>%
+    
+    dplyr::ungroup()
+  
+  # Sanity check
+  wa <- 
+    stateCovid %>% 
+    filter(stateCode == "WA") %>% 
+    select(date, t_diff, t_diff_15)
+  
+  gg <- 
+    ggplot(wa) + 
+    geom_line(aes(x = date, y = t_diff)) + 
+    geom_line(aes(x = date, y = t_diff_15), col = 'red')
+  
+  print(gg)
+    
+  stateCovid <-
+    
+    stateCovid %>%
+    
     ###dplyr::ungroup() %>%
     # Add derived values
     mutate(
-      tests_per_100 = 100 * tests/population,
-      confirmed_per_100 = 100 * confirmed/population,
-      recovered_per_100K = 100000 * recovered/population,
-      deaths_per_100K = 100000 * deaths/population,
-      # tests_per_100 = 100 * t_diff/population,
-      # confirmed_per_100 = 100 * c_diff/population,
-      # recovered_per_100K = 100000 * r_diff/population,
-      # deaths_per_100K = 100000 * d_diff/population,
+      # tests_per_100K = 100000 * tests/population,
+      # confirmed_per_100K = 100000 * confirmed/population,
+      # recovered_per_100K = 100000 * recovered/population,
+      # deaths_per_100K = 100000 * deaths/population,
+      tests_per_100K = 100000 * t_diff_15/population,
+      confirmed_per_100K = 100000 * c_diff_15/population,
+      recovered_per_100K = 100000 * r_diff_15/population,
+      deaths_per_100K = 100000 * d_diff_15/population,
       hosp_per_100K = 100000 * hosp/population,
       vent_per_100K = 100000 * vent/population,
       icu_per_100K = 100000 * icu/population
@@ -40,7 +73,7 @@ if ( FALSE ) {
   
   # ----- TWO STATES 1 MONTH -----
   generateMovie(data = stateCovid, 
-                parameter = "confirmed_per_100", 
+                parameter = "confirmed_per_100K", 
                 stateCodes = c("WA", "OR"),
                 startDate = 20200601,
                 endDate = 20200701,
@@ -53,7 +86,7 @@ if ( FALSE ) {
   
   # ----- TWO STATES 1 MONTH TWO PARAMS-----
   generateMovie(data = stateCovid, 
-                parameter = c("confirmed_per_100", "tests_per_100"), 
+                parameter = c("confirmed_per_100K", "tests_per_100K"), 
                 stateCodes = c("WA", "OR"),
                 startDate = 20200601,
                 endDate = 20200701,
@@ -67,11 +100,12 @@ if ( FALSE ) {
   
   # ----- ALL STATES WHOLE YEAR -----
   generateMovie(data = stateCovid, 
-                parameter = "confirmed_per_100", 
+                parameter = "confirmed_per_100K", 
                 startDate = 20200101, 
                 endDate = lubridate::today(tzone = "America/Los_Angeles") - lubridate::ddays(1), 
                 saveDir = "/Users/jonathan", 
-                breaks = seq(0, max(stateCovid$confirmed_per_100, na.rm = T), 0.1), 
+                # Range is -.003:0.086
+                breaks = c(-Inf, 0, 1, 2, 5, 10, 20, 50, 100, 200, 500, Inf), 
                 movieFileName = "covid_confirmed_2020",
                 main.title = "Confirmed COVID Cases (Per 100 Citizens)",
                 frame = TRUE,
@@ -205,17 +239,18 @@ generateMovie <- function(
       )
     }
     
-    tm <- tm + tmap::tm_layout(
-      frame = frame,
-      main.title = paste0(main.title, sprintf("\n %s", datestamp)),
-      main.title.position = c("center", "top"),
-      title = title,
-      title.position = c("center", "top"),
-      title.fontface = 2,
-      fontfamily = "serif",
-      legend.position = c('left', 'top'),
-      ...
-    )
+    tm <- tm + 
+      tmap::tm_layout(
+        frame = frame,
+        main.title = paste0(main.title, sprintf("\n %s", datestamp)),
+        main.title.position = c("center", "top"),
+        title = title,
+        title.position = c("center", "top"),
+        title.fontface = 2,
+        fontfamily = "serif",
+        legend.position = c('left', 'top'),
+        ...
+      )
     
     # Save plot
     tmap::tmap_save(
@@ -245,7 +280,7 @@ generateMovie <- function(
   # Define system calls to ffmpeg to create video from frames
   cmd_cd <- paste0("cd ", saveDir)
   cmd_ffmpeg <- paste0(
-    "/Users/jonathan/bin/ffmpeg -y -loglevel ", loglevel, " -r ", 
+    "ffmpeg -y -loglevel ", loglevel, " -r ", 
     frameRate, " -f image2 -s ", imageWidthPx, "x", imageHeightPx, " -i ", 
     imageNameBase, "%03d.png -vcodec libx264 -crf 25 ", 
     # https://bugzilla.mozilla.org/show_bug.cgi?id=1368063#c7
