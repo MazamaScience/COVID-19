@@ -17,10 +17,13 @@ if ( FALSE ) {
       stateCode = key_alpha_2
     ) %>%
     
+    # Further dplyr manipulations will be applied per state
     dplyr::group_by(stateCode) %>%
     
-    # NOTE:  tests, confirmed, recoverd and deaths are cumulative
+    # NOTE:  tests, confirmed, recovered and deaths are cumulative
     # NOTE:  https://covid19datahub.io/articles/doc/data.html
+    
+    # Create daily statistics from cumulative
     dplyr::mutate(
       t_diff = c(NA, diff(tests)),
       c_diff = c(NA, diff(confirmed)),
@@ -30,24 +33,25 @@ if ( FALSE ) {
     
     # Add rolling means
     dplyr::mutate(
-      t_diff_15 = zoo::rollmean(t_diff, k = 15, align = "right", fill = NA),
-      c_diff_15 = zoo::rollmean(c_diff, k = 15, align = "right", fill = NA),
-      r_diff_15 = zoo::rollmean(r_diff, k = 15, align = "right", fill = NA),
-      d_diff_15 = zoo::rollmean(d_diff, k = 15, align = "right", fill = NA)
+      t_diff_14 = zoo::rollmean(t_diff, k = 14, align = "right", fill = NA),
+      c_diff_14 = zoo::rollmean(c_diff, k = 14, align = "right", fill = NA),
+      r_diff_14 = zoo::rollmean(r_diff, k = 14, align = "right", fill = NA),
+      d_diff_14 = zoo::rollmean(d_diff, k = 14, align = "right", fill = NA)
     ) %>%
     
+    # Stop grouping by state
     dplyr::ungroup()
   
   # Sanity check
   wa <- 
     stateCovid %>% 
     filter(stateCode == "WA") %>% 
-    select(date, t_diff, t_diff_15)
+    select(date, t_diff, t_diff_14)
   
   gg <- 
     ggplot(wa) + 
     geom_line(aes(x = date, y = t_diff)) + 
-    geom_line(aes(x = date, y = t_diff_15), col = 'red')
+    geom_line(aes(x = date, y = t_diff_14), col = 'red')
   
   print(gg)
     
@@ -55,61 +59,33 @@ if ( FALSE ) {
     
     stateCovid %>%
     
-    ###dplyr::ungroup() %>%
     # Add derived values
     mutate(
-      # tests_per_100K = 100000 * tests/population,
-      # confirmed_per_100K = 100000 * confirmed/population,
-      # recovered_per_100K = 100000 * recovered/population,
-      # deaths_per_100K = 100000 * deaths/population,
-      tests_per_100K = 100000 * t_diff_15/population,
-      confirmed_per_100K = 100000 * c_diff_15/population,
-      recovered_per_100K = 100000 * r_diff_15/population,
-      deaths_per_100K = 100000 * d_diff_15/population,
+      tests_per_100K = 100000 * t_diff_14/population,
+      confirmed_per_100K = 100000 * c_diff_14/population,
+      recovered_per_100K = 100000 * r_diff_14/population,
+      deaths_per_100K = 100000 * d_diff_14/population,
       hosp_per_100K = 100000 * hosp/population,
       vent_per_100K = 100000 * vent/population,
       icu_per_100K = 100000 * icu/population
     )
   
-  # ----- TWO STATES 1 MONTH -----
-  generateMovie(data = stateCovid, 
-                parameter = "confirmed_per_100K", 
-                stateCodes = c("WA", "OR"),
-                startDate = 20200601,
-                endDate = 20200701,
-                breaks = seq(0, max(stateCovid$confirmed_per_100, na.rm = TRUE), .1),
-                saveDir = "/Users/jonathan",
-                movieFileName = "covid_confirmed",
-                main.title = "Confirmed COVID Cases (Per 100 Citizens)",
-                frame = TRUE,
-                inner.margins = .1)
-  
-  # ----- TWO STATES 1 MONTH TWO PARAMS-----
-  generateMovie(data = stateCovid, 
-                parameter = c("confirmed_per_100K", "tests_per_100K"), 
-                stateCodes = c("WA", "OR"),
-                startDate = 20200601,
-                endDate = 20200701,
-                breaks = c(0, .1, .2, .3, .4, .5, 1, 3, 5, 7, 9),
-                saveDir = "/Users/jonathan",
-                movieFileName = "covid_confirmed_tests",
-                main.title = "Confirmed COVID Cases and COVID Tests (Per 100)",
-                title = c("Confirmed per 100", "Tests per 100"),
-                frame = TRUE,
-                inner.margins = .1)
-  
+
   # ----- ALL STATES WHOLE YEAR -----
-  generateMovie(data = stateCovid, 
-                parameter = "confirmed_per_100K", 
-                startDate = 20200101, 
-                endDate = lubridate::today(tzone = "America/Los_Angeles") - lubridate::ddays(1), 
-                saveDir = "/Users/jonathan", 
-                # Range is -.003:0.086
-                breaks = c(-Inf, 0, 1, 2, 5, 10, 20, 50, 100, Inf), 
-                movieFileName = "covid_confirmed_2020",
-                main.title = "Confirmed COVID Cases (Per 100 Citizens)",
-                frame = TRUE,
-                inner.margins = .1)
+  generateMovie(
+    data = stateCovid, 
+    parameter = "confirmed_per_100K", 
+    startDate = 20200101, 
+    endDate = lubridate::today(tzone = "America/Los_Angeles") - lubridate::ddays(1), 
+    saveDir = "/Users/jonathan", 
+    # Range is -.003:0.086
+    breaks = c(-Inf, 0, 1, 2, 5, 10, 20, 50, 100, Inf), 
+    movieFileName = "covid_confirmed_2020",
+    main.title = "Confirmed COVID Cases (Per 100,000 Citizens)",
+    frame = TRUE,
+    frameRate = 7,
+    inner.margins = .1
+  )
   
 }
 
@@ -142,7 +118,7 @@ if ( FALSE ) {
   breaks = seq(0, max(stateCovid$confirmed_per_100, na.rm = TRUE), .1)
   saveDir = "/Users/jonathan"
   movieFileName = "covid_confirmed"
-  main.title = "Confirmed COVID Cases (Per 100 Citizens)"
+  main.title = "14-day Rolling Mean Confirmed COVID Cases (Per 100,000)"
   frame = TRUE
   inner.margins = .1
   
@@ -165,7 +141,7 @@ generateMovie <- function(
   imageWidth = 10,
   imageHeight = 8,
   imageDpi = 75,
-  frameRate = 6,
+  frameRate = 7,
   saveDir = NULL,
   movieFileName = NULL,
   verbose = FALSE,
@@ -228,13 +204,15 @@ generateMovie <- function(
       tm <- MazamaSpatialPlots::stateMap(
         data = dplyr::filter(data, date == datestamp),
         parameter = parameter,
-        breaks = breaks
+        breaks = breaks,
+        stateBorderColor = "white"
       )    
     } else {
       tm <- MazamaSpatialPlots::stateMap(
         data = dplyr::filter(data, date == datestamp),
         parameter = parameter,
         breaks = breaks,
+        stateBorderColor = "white",
         stateCode = stateCodes
       )
     }
@@ -248,7 +226,7 @@ generateMovie <- function(
         title.position = c("center", "top"),
         title.fontface = 2,
         fontfamily = "serif",
-        legend.position = c('left', 'top'),
+        legend.position = c('left', 'bottom'),
         ...
       )
     
